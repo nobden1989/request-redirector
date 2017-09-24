@@ -1,0 +1,6 @@
+---
+applications:
+- name: pcf-demo
+  memory: 1G
+  instances: 2
+  path: build/libs/pcf-demo-0.1.0.jar
