@@ -10,6 +10,7 @@ import java.net.URL;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.net.ssl.HttpsURLConnection;
@@ -51,10 +52,12 @@ public class GreetingController {
 		DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
 		String time = "[" + dateFormat.format(new Date()) + "]";
-
+		UUID idGen = UUID.randomUUID();
+		String uuid = idGen.toString();
 		System.out.println("=========================Mock Request start=========================");
 		System.out.println(time + "Request Send from:" + remoteAddr);
 		System.out.println(time + "Request Send to:" + httpsUrl);
+		System.out.println(time + "Request Tracking Header: [AQA-TRACKER:" + uuid + "]");
 		URL url;
 		try {
 
@@ -62,10 +65,10 @@ public class GreetingController {
 
 			if ("HTTPS".equalsIgnoreCase(url.getProtocol())) {
 				HttpsURLConnection con = (HttpsURLConnection) url.openConnection();
-				return print_content(con, response);
+				return print_content(con, response, uuid);
 			} else if ("HTTP".equalsIgnoreCase(url.getProtocol())) {
 				HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
-				return sendGet(httpConn, response);
+				return sendGet(httpConn, response, uuid);
 			}
 
 		} catch (MalformedURLException e) {
@@ -79,10 +82,11 @@ public class GreetingController {
 		return "Something Wrong";
 	}
 
-	private String print_content(HttpsURLConnection con, HttpServletResponse response) {
+	private String print_content(HttpsURLConnection con, HttpServletResponse response, String uuid) {
 		if (con != null) {
 			try {
 
+				con.setRequestProperty("AQA-TRACKER", uuid);
 				BufferedReader br = new BufferedReader(new InputStreamReader(con.getInputStream()));
 
 				String message = IOUtils.toString(br);
@@ -98,17 +102,18 @@ public class GreetingController {
 	}
 
 	// HTTP GET request
-	private String sendGet(HttpURLConnection con, HttpServletResponse response) throws Exception {
+	private String sendGet(HttpURLConnection con, HttpServletResponse response, String uuid) throws Exception {
 
 		// optional default is GET
 		con.setRequestMethod("GET");
+		con.setRequestProperty("AQA-TRACKER", uuid);
 		InputStream _is;
 		response.setStatus(con.getResponseCode());
 		if (con.getResponseCode() < HttpURLConnection.HTTP_BAD_REQUEST) {
-		    _is = con.getInputStream();
+			_is = con.getInputStream();
 		} else {
-		     /* error from server */
-		    _is = con.getErrorStream();
+			/* error from server */
+			_is = con.getErrorStream();
 		}
 
 		BufferedReader in = new BufferedReader(new InputStreamReader(_is));
