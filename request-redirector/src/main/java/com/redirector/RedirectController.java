@@ -4,15 +4,19 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLDecoder;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
 
+import javax.management.RuntimeErrorException;
 import javax.net.ssl.HttpsURLConnection;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -21,19 +25,32 @@ import org.apache.commons.io.IOUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class RedirectController {
 
-	private static final String template = "Hello, %s!";
-	private final AtomicLong counter = new AtomicLong();
+	private static final int KILL_TRIGGERED = 1;
+	private static final int KILL_DISABLED = 0;
+
+	private static int killTrigger = KILL_DISABLED;
 
 	@PostMapping("/redirect")
-	public String mockUrl(@RequestBody String body, HttpServletRequest request, HttpServletResponse response) {
+	public String mockUrl(@RequestBody String body, HttpServletRequest request, HttpServletResponse response)
+			throws Exception {
 
-		String httpsUrl = body.replace("{", "").replace("}", "");
+		if (killTrigger == KILL_TRIGGERED) {
+			response.setStatus(500);
+			return "Kill Triggered, process terminated!";
+		}
+
+		String result = URLDecoder.decode(body, "UTF-8");
+
+		Map<String, Object> reqBody = JsonUtil.fromJson(result);
+
+		String httpsUrl = String.valueOf(reqBody.get("url"));
+		String method = String.valueOf(reqBody.get("method"));
+		LinkedHashMap<String, Object> data = (LinkedHashMap<String, Object>) reqBody.get("body");
 
 		String remoteAddr = "";
 
@@ -60,10 +77,11 @@ public class RedirectController {
 
 			if ("HTTPS".equalsIgnoreCase(url.getProtocol())) {
 				HttpsURLConnection con = (HttpsURLConnection) url.openConnection();
-				return print_content(con, response, uuid);
+
+				return print_content(con, method, response, uuid, JsonUtil.toJson(data));
 			} else if ("HTTP".equalsIgnoreCase(url.getProtocol())) {
 				HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
-				return sendGet(httpConn, response, uuid);
+				return sendPost(httpConn, method, response, uuid, JsonUtil.toJson(data));
 			}
 
 		} catch (MalformedURLException e) {
@@ -77,11 +95,18 @@ public class RedirectController {
 		return "Something Wrong";
 	}
 
-	private String print_content(HttpsURLConnection con, HttpServletResponse response, String uuid) {
+	private String print_content(HttpsURLConnection con, String method, HttpServletResponse response, String uuid,
+			String body) {
 		if (con != null) {
 			try {
-
+				con.setRequestMethod(method);
+				con.setDoOutput(true);
 				con.setRequestProperty("AQA-TRACKER", uuid);
+				if (null != body) {
+					OutputStream os = con.getOutputStream();
+					os.write(body.getBytes());
+					os.close();
+				}
 				BufferedReader br = new BufferedReader(new InputStreamReader(con.getInputStream()));
 
 				String message = IOUtils.toString(br);
@@ -97,11 +122,18 @@ public class RedirectController {
 	}
 
 	// HTTP GET request
-	private String sendGet(HttpURLConnection con, HttpServletResponse response, String uuid) throws Exception {
+	private String sendPost(HttpURLConnection con, String method, HttpServletResponse response, String uuid,
+			String body) throws Exception {
 
-		// optional default is GET
-		con.setRequestMethod("GET");
+		// optional default is POST
+		con.setRequestMethod(method);
 		con.setRequestProperty("AQA-TRACKER", uuid);
+		con.setDoOutput(true);
+		if (null != body) {
+			OutputStream os = con.getOutputStream();
+			os.write(body.getBytes());
+			os.close();
+		}
 		InputStream _is;
 		response.setStatus(con.getResponseCode());
 		if (con.getResponseCode() < HttpURLConnection.HTTP_BAD_REQUEST) {
@@ -123,5 +155,16 @@ public class RedirectController {
 		// print result
 		return resBody.toString();
 
+	}
+
+	@GetMapping("/toggleKill")
+	public String mockUrl(HttpServletRequest request) {
+		return RedirectController.toggleKill();
+	}
+
+	public static String toggleKill() {
+		RedirectController.killTrigger = RedirectController.killTrigger == KILL_DISABLED ? KILL_TRIGGERED
+				: KILL_DISABLED;
+		return RedirectController.killTrigger == KILL_DISABLED ? "Kill disabled" : "Kill triggered";
 	}
 }
