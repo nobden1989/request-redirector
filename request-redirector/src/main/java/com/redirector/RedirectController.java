@@ -38,7 +38,7 @@ public class RedirectController {
 	@PostMapping("/redirect")
 	public String mockUrl(@RequestBody String body, HttpServletRequest request, HttpServletResponse response)
 			throws Exception {
-
+		response.addHeader("Access-Control-Allow-Origin", "*");
 		if (killTrigger == KILL_TRIGGERED) {
 			response.setStatus(500);
 			return "Kill Triggered, process terminated!";
@@ -85,12 +85,12 @@ public class RedirectController {
 			}
 
 		} catch (MalformedURLException e) {
-			e.printStackTrace();
+			
 		} catch (IOException e) {
-			e.printStackTrace();
+			
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
+			
 		}
 		return "Something Wrong";
 	}
@@ -114,7 +114,7 @@ public class RedirectController {
 				response.setStatus(con.getResponseCode());
 				return message;
 			} catch (IOException e) {
-				e.printStackTrace();
+				
 			}
 
 		}
