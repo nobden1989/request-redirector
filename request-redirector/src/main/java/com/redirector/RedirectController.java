@@ -16,12 +16,13 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
-import javax.management.RuntimeErrorException;
 import javax.net.ssl.HttpsURLConnection;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.io.IOUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -29,6 +30,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class RedirectController {
+
+	private static final Logger LOG = LoggerFactory.getLogger(RedirectController.class);
 
 	private static final int KILL_TRIGGERED = 1;
 	private static final int KILL_DISABLED = 0;
@@ -85,12 +88,13 @@ public class RedirectController {
 			}
 
 		} catch (MalformedURLException e) {
-			
+
+			LOG.debug("", e);
 		} catch (IOException e) {
-			
+			LOG.debug("", e);
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
-			
+			LOG.debug("", e);
 		}
 		return "Something Wrong";
 	}
@@ -114,7 +118,7 @@ public class RedirectController {
 				response.setStatus(con.getResponseCode());
 				return message;
 			} catch (IOException e) {
-				
+				LOG.debug("", e);
 			}
 
 		}
